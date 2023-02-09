@@ -87,7 +87,6 @@ function renderChart() {
 
   const groupedData = d3.group(data, ...groupingFunctions);
 
-  // packedData = d3.hierarchy(groupedData)
   packedData = {name: 'pack', children: []};
   for (row of data) {
     packData(packedData, groupingFunctions, row);

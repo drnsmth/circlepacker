@@ -85,21 +85,30 @@ function renderChart() {
     groupingFunctions.push(d => d[columnName]);
   })
 
-  const groupedData = d3.group(data, ...groupingFunctions);
-
-  packedData = {name: 'pack', children: []};
-  for (row of data) {
-    packData(packedData, groupingFunctions, row);
-  }
-  convertChildrenToArrays(packedData);
-
   const leafColumn = document.getElementById('label-column').value; 
   const colorColumn = document.getElementById('color-column').value; 
+
+  packedData = {name: 'pack', children: []};
+  const distinctColorEntries = [];
+
+  for (row of data) {
+    packData(packedData, groupingFunctions, row);
+    distinctColorEntries[row[colorColumn]] = null;
+  }
+
+  const distinctCount = Object.keys(distinctColorEntries).length;
+  let distinctIndex = 0;
+  for (const entry in distinctColorEntries) {
+    distinctColorEntries[entry] = d3.interpolateRainbow(distinctIndex++ / distinctCount);
+  }
+
+  convertChildrenToArrays(packedData);
 
   let circleChart = Pack(packedData, {
     value: d => 1000, // size of each node (file); null for internal nodes (folders)
     label: (d, n) => d.children ? d.name : d[leafColumn],
     title: (d, n) => d.children ? d.name : d[leafColumn] +  " - " + d[colorColumn],
+    fillFunc: (d) => distinctColorEntries[d[colorColumn]],
     width: 1152,
     height: 1152
   });
@@ -159,6 +168,7 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
   marginLeft = margin, // left margin, in pixels
   padding = 3, // separation between circles
   fill = "#ddd", // fill for leaf circles
+  fillFunc, // If provided, overrides fill with function call
   fillOpacity, // fill opacity for leaf circles
   stroke = "#bbb", // stroke for internal circles
   strokeWidth, // stroke width for internal circles
@@ -209,7 +219,7 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
       .attr("transform", d => `translate(${d.x},${d.y})`);
 
   node.append("circle")
-      .attr("fill", d => d.children ? "#fff" : fill)
+      .attr("fill", d => d.children ? "#fff" : fillFunc ? fillFunc(d.data) : fill)
       .attr("fill-opacity", d => d.children ? null : fillOpacity)
       .attr("stroke", d => d.children ? stroke : null)
       .attr("stroke-width", d => d.children ? strokeWidth : null)

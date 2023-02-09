@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Circle Packer - Converts CSV files tro circle packing diagrams</title>
+  <meta name="description" content="A simple use of d3.js Circle Packing diagrams to visual data provided in CSV">
+  <link rel="stylesheet" href="circlepacker.css">
+
+</head>
+<body>
+  <div class="header">
+    <div class="container">
+      <div class="content">
+        <h1>
+          circle packer
+        </h1>
+        <h2>Convert CSV files to circle packing diagrams</h2>
+        <p>Drag a CSV file onto the box to convert. This file is processed in the browser and not sent to
+          a server. Feel free to check out the code if you have concerns about privacy.
+        </p>
+      </div>
+      <div class="content">
+        <div id="upload-area">
+          <img src="images/outline_upload_file_white_48dp.png" >
+          Drag and drop CSV file here...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chart-menu" class="menu">
+    <div class="container">
+      <div class="menu-item">
+        <div>
+          <label for="first-level">First Level:</label>
+        </div>
+        <div>
+          <select id="first-level" name="first-level"></select>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <label for="second-level">Second Level:</label>
+        </div>
+        <div>
+          <select id="second-level" name="second-level"></select>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <label for="third-level">Third Level:</label>
+        </div>
+        <div>
+          <select id="third-level" name="third-level"></select>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <label for="label-column">Label leaf nodes:</label>
+        </div>
+        <div>
+          <select id="label-column" name="label-column"></select>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <label for="color-column">Color distinct values:</label>
+        </div>
+        <div>
+          <select id="color-column" name="color-column"></select>
+        </div>
+      </div>
+      <div class="menu-item">
+        <div>
+          <button type="button" id="render-button" class="btn btn-render">Pack It</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="container">
+      <div id="chart-area" class="chart">
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+  </div>
+</body>
+<!-- Linking your scripts.js here after the DOM has loaded to allow element targeting with d3. -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="lib/papaparse/papaparse.min.js"></script>
+<script src="circlepacker.js"></script>
+</html>

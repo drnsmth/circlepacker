@@ -254,30 +254,103 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
 
   if (T) node.append("title").text((d, i) => T[i]);
 
+  // Create arc paths for parent circle labels (9 o'clock to 3 o'clock)
+  const uid = `O-${Math.random().toString(16).slice(2)}`;
+
+  const parentNodes = svg.append("g")
+      .attr("pointer-events", "none")
+    .selectAll("g")
+    .data(descendants.filter(d => d.children && d.depth > 0))
+    .join("g");
+
+  // Create arc path for each parent circle
+  parentNodes.append("path")
+    .attr("id", d => `${uid}-path-${d.data.name}-${d.depth}`)
+    .attr("fill", "none")
+    .attr("d", d => {
+      const r = d.r;
+      // Arc from 9 o'clock (-180°) to 3 o'clock (0°) along top
+      const startAngle = Math.PI; // 9 o'clock
+      const endAngle = 0; // 3 o'clock
+      const x1 = d.x + r * Math.cos(startAngle);
+      const y1 = d.y + r * Math.sin(startAngle);
+      const x2 = d.x + r * Math.cos(endAngle);
+      const y2 = d.y + r * Math.sin(endAngle);
+      return `M ${x1},${y1} A ${r},${r} 0 0,0 ${x2},${y2}`;
+    });
+
+  // White background stroke for readability
+  parentNodes.append("text")
+    .style("font", "10px Helvetica, Arial, sans-serif")
+    .style("letter-spacing", "-0.5px")
+    .attr("fill", "none")
+    .attr("stroke", "white")
+    .attr("stroke-width", 3)
+    .attr("stroke-linejoin", "round")
+    .style("fill-opacity", d => d.parent === root ? 1 : 0)
+    .style("display", d => d.parent === root ? "inline" : "none")
+    .append("textPath")
+      .attr("href", d => `#${uid}-path-${d.data.name}-${d.depth}`)
+      .attr("startOffset", "50%")
+      .attr("text-anchor", "middle")
+      .text(d => d.data.name);
+
+  // Actual text label
+  parentNodes.append("text")
+    .style("font", "10px Helvetica, Arial, sans-serif")
+    .style("letter-spacing", "-0.5px")
+    .attr("fill", "#333")
+    .style("fill-opacity", d => d.parent === root ? 1 : 0)
+    .style("display", d => d.parent === root ? "inline" : "none")
+    .append("textPath")
+      .attr("href", d => `#${uid}-path-${d.data.name}-${d.depth}`)
+      .attr("startOffset", "50%")
+      .attr("text-anchor", "middle")
+      .text(d => d.data.name);
+
+  // Labels for leaf nodes (centered in circle)
   const labelGroup = svg.append("g")
-      .style("font", "10px sans-serif")
+      .style("font", "10px Helvetica, Arial, sans-serif")
       .attr("pointer-events", "none")
       .attr("text-anchor", "middle")
     .selectAll("text")
-    .data(descendants)
+    .data(descendants.filter(d => !d.children))
     .join("text")
       .style("fill-opacity", d => d.parent === root ? 1 : 0)
       .style("display", d => d.parent === root ? "inline" : "none")
-      .text(d => {
-        if (d.children) return d.data.name;
-        if (L && d.index !== undefined) return L[d.index];
-        return "";
-      });
+      .text(d => L && d.index !== undefined ? L[d.index] : "");
 
   zoomTo([root.x, root.y, root.r * 2]);
 
   function zoomTo(v) {
     const k = width / v[2];
     view = v;
+
+    // Update leaf labels
     labelGroup.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
     labelGroup.attr("font-size", d => Math.min(12, d.r * k / 3) + "px");
+
+    // Update circles
     node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
     node.attr("r", d => d.r * k);
+
+    // Update parent node arc paths and labels
+    parentNodes.select("path").attr("d", d => {
+      const r = d.r * k;
+      const cx = (d.x - v[0]) * k;
+      const cy = (d.y - v[1]) * k;
+      const startAngle = Math.PI;
+      const endAngle = 0;
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+      return `M ${x1},${y1} A ${r},${r} 0 0,0 ${x2},${y2}`;
+    });
+
+    // Scale font size for parent labels
+    parentNodes.selectAll("text")
+      .style("font-size", d => Math.min(14, Math.max(8, d.r * k / 4)) + "px");
   }
 
   function zoom(event, d) {
@@ -290,7 +363,16 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
           return t => zoomTo(i(t));
         });
 
+    // Transition leaf labels
     labelGroup
+      .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
+      .transition(transition)
+        .style("fill-opacity", d => d.parent === focus ? 1 : 0)
+        .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
+        .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+
+    // Transition parent labels
+    parentNodes.selectAll("text")
       .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
       .transition(transition)
         .style("fill-opacity", d => d.parent === focus ? 1 : 0)

@@ -148,10 +148,11 @@ function convertChildrenToArrays(parent) {
 // Copyright 2021 Observable, Inc.
 // Released under the ISC license.
 // https://observablehq.com/@d3/pack
+// Modified to add zoomable functionality
 function Pack(data, { // data is either tabular (array of objects) or hierarchy (nested objects)
   path, // as an alternative to id and parentId, returns an array identifier, imputing internal nodes
   id = Array.isArray(data) ? d => d.id : null, // if tabular data, given a d in data, returns a unique identifier (string)
-  parentId = Array.isArray(data) ? d => d.parentId : null, // if tabular data, given a node d, returns its parent’s identifier
+  parentId = Array.isArray(data) ? d => d.parentId : null, // if tabular data, given a node d, returns its parent's identifier
   children, // if hierarchical data, given a d in data, returns its children
   value, // given a node d, returns a quantitative value (for area encoding; null for count)
   sort = (a, b) => d3.descending(a.value, b.value), // how to sort nodes prior to layout
@@ -177,7 +178,7 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
 
   // If id and parentId options are specified, or the path option, use d3.stratify
   // to convert tabular data to a hierarchy; otherwise we assume that the data is
-  // specified as an object {children} with nested objects (a.k.a. the “flare.json”
+  // specified as an object {children} with nested objects (a.k.a. the "flare.json"
   // format), and use d3.hierarchy.
   const root = path != null ? d3.stratify().path(path)(data)
       : id != null || parentId != null ? d3.stratify().id(id).parentId(parentId)(data)
@@ -202,53 +203,78 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
       .padding(padding)
     (root);
 
+  // Zoom state
+  let focus = root;
+  let view;
+
   const svg = d3.create("svg")
-      .attr("viewBox", [-marginLeft, -marginTop, width, height])
+      .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
       .attr("width", width)
       .attr("height", height)
-      .attr("style", "max-width: 100%; height: auto; height: intrinsic;")
+      .attr("style", "max-width: 100%; height: auto; display: block; cursor: pointer;")
       .attr("font-family", "sans-serif")
       .attr("font-size", 10)
-      .attr("text-anchor", "middle");
+      .attr("text-anchor", "middle")
+      .on("click", (event) => zoom(event, root));
 
-  const node = svg.selectAll("a")
+  const node = svg.append("g")
+    .selectAll("circle")
     .data(descendants)
-    .join("a")
-      .attr("xlink:href", link == null ? null : (d, i) => link(d.data, d))
-      .attr("target", link == null ? null : linkTarget)
-      .attr("transform", d => `translate(${d.x},${d.y})`);
-
-  node.append("circle")
+    .join("circle")
       .attr("fill", d => d.children ? "#fff" : fillFunc ? fillFunc(d.data) : fill)
       .attr("fill-opacity", d => d.children ? null : fillOpacity)
       .attr("stroke", d => d.children ? stroke : null)
       .attr("stroke-width", d => d.children ? strokeWidth : null)
       .attr("stroke-opacity", d => d.children ? strokeOpacity : null)
-      .attr("r", d => d.r);
+      .attr("pointer-events", d => !d.children ? "none" : null)
+      .on("mouseover", function() { d3.select(this).attr("stroke", "#000"); })
+      .on("mouseout", function(event, d) { d3.select(this).attr("stroke", d.children ? stroke : null); })
+      .on("click", (event, d) => focus !== d && (zoom(event, d), event.stopPropagation()));
 
   if (T) node.append("title").text((d, i) => T[i]);
 
-  if (L) {
-    // A unique identifier for clip paths (to avoid conflicts).
-    const uid = `O-${Math.random().toString(16).slice(2)}`;
+  const labelGroup = svg.append("g")
+      .style("font", "10px sans-serif")
+      .attr("pointer-events", "none")
+      .attr("text-anchor", "middle")
+    .selectAll("text")
+    .data(descendants)
+    .join("text")
+      .style("fill-opacity", d => d.parent === root ? 1 : 0)
+      .style("display", d => d.parent === root ? "inline" : "none")
+      .text(d => {
+        if (d.children) return d.data.name;
+        if (L && d.index !== undefined) return L[d.index];
+        return "";
+      });
 
-    const leaf = node
-      .filter(d => !d.children && d.r > 10 && L[d.index] != null);
+  zoomTo([root.x, root.y, root.r * 2]);
 
-    leaf.append("clipPath")
-        .attr("id", d => `${uid}-clip-${d.index}`)
-      .append("circle")
-        .attr("r", d => d.r);
+  function zoomTo(v) {
+    const k = width / v[2];
+    view = v;
+    labelGroup.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+    labelGroup.attr("font-size", d => Math.min(12, d.r * k / 3) + "px");
+    node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+    node.attr("r", d => d.r * k);
+  }
 
-    leaf.append("text")
-        .attr("clip-path", d => `url(${new URL(`#${uid}-clip-${d.index}`, location)})`)
-      .selectAll("tspan")
-      .data(d => `${L[d.index]}`.split(/\n/g))
-      .join("tspan")
-        .attr("x", 0)
-        .attr("y", (d, i, D) => `${(i - D.length / 2) + 0.85}em`)
-        .attr("fill-opacity", (d, i, D) => i === D.length - 1 ? 0.7 : null)
-        .text(d => d);
+  function zoom(event, d) {
+    focus = d;
+
+    const transition = svg.transition()
+        .duration(event.altKey ? 7500 : 750)
+        .tween("zoom", () => {
+          const i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2]);
+          return t => zoomTo(i(t));
+        });
+
+    labelGroup
+      .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
+      .transition(transition)
+        .style("fill-opacity", d => d.parent === focus ? 1 : 0)
+        .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
+        .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
   }
 
   return svg.node();

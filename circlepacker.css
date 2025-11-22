@@ -113,41 +113,102 @@ p {
 
 .menu-item {
   flex: 1 1 10em;
+  padding: 0.5rem;
+}
+
+.menu-item label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.menu-item select {
+  width: 100%;
+  padding: 0.25rem;
+  font-size: 0.9rem;
 }
 
 @media(max-width: 920px) {
   .container {
-    padding-top: 5em;
-    padding-bottom: 5em;
+    padding-top: 3em;
+    padding-bottom: 3em;
     flex-direction: column;
   }
 
+  .header > .container {
+    min-height: auto;
+    padding-top: 2em;
+    padding-bottom: 2em;
+  }
+
   #upload-area {
-    height: 8rem;
-    line-height: 8rem;
-    width: 30rem;
+    height: 6rem;
+    line-height: 6rem;
+    width: 100%;
+    max-width: 25rem;
+  }
+
+  .menu > .container {
+    min-height: auto;
+    padding-top: 1em;
+    padding-bottom: 1em;
+  }
+
+  .menu-item {
+    flex: 1 1 8em;
+    padding: 0.25rem;
   }
 
   .chart {
-    margin-top: 2em;
+    margin-top: 1em;
   }
 }
 
 @media(max-width: 600px) {
   .container {
-    padding-left: 1.5em;
-    padding-right: 1.5em;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   h1 {
-    font-size: 3rem;
+    font-size: 2.5rem;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+    margin-top: 1.5rem;
+  }
+
+  p {
+    font-size: 0.9rem;
   }
 
   #upload-area {
-    height: 8rem;
-    line-height: 8rem;
-    width: 20rem;
+    height: 5rem;
+    line-height: 5rem;
+    padding-left: 1.5rem;
+    font-size: 0.75rem;
+  }
+
+  #upload-area > img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .menu-item {
+    flex: 1 1 45%;
+  }
+
+  .menu-item label {
+    font-size: 0.75rem;
+  }
+
+  .menu-item select {
     font-size: 0.8rem;
+  }
+
+  .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
   }
 }
 
@@ -194,7 +255,8 @@ p {
 .chart {
   flex: 1;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+  width: 100%;
 }
 
 

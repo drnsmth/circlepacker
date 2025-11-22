@@ -110,17 +110,34 @@ function renderChart() {
 
   convertChildrenToArrays(packedData);
 
+  // Calculate responsive size based on container width
+  const chartArea = document.getElementById("chart-area");
+  const container = chartArea.closest('.container');
+  const containerWidth = container ? container.clientWidth : (chartArea.clientWidth || 1152);
+  const size = Math.min(containerWidth, window.innerHeight - 100);
+
   let circleChart = Pack(packedData, {
     value: d => 1000, // size of each node (file); null for internal nodes (folders)
     label: (d, n) => d.children ? d.name : d[leafColumn],
     title: (d, n) => d.children ? d.name : d[leafColumn] +  " - " + d[colorColumn],
     fillFunc: (d) => distinctColorEntries[d[colorColumn]],
-    width: 1152,
-    height: 1152
+    width: size,
+    height: size
   });
 
-  document.getElementById("chart-area").replaceChildren(circleChart);
+  chartArea.replaceChildren(circleChart);
 }
+
+// Re-render on window resize (debounced)
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    if (packedData && packedData.children && packedData.children.length > 0) {
+      renderChart();
+    }
+  }, 250);
+});
 
 function packData(node, groupingFunctions, row) {
   if (groupingFunctions.length > 0 && groupingFunctions[0]) {

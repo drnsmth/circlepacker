@@ -250,6 +250,45 @@ p {
 	border-radius: .25rem;
 	transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
+/* Toolbar styles */
+.toolbar {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.toolbar.hidden {
+  display: none;
+}
+
+.toolbar > .container {
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #333;
+  background-color: #fff;
+  border-color: #ccc;
+}
+
+.btn-export:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.btn-export svg {
+  flex-shrink: 0;
+}
+
 /* Chart styles */
 
 .chart {

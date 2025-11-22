@@ -3,10 +3,16 @@ const uploadArea = document.getElementById('upload-area');
 const renderButton = document.getElementById('render-button');
 const legendToggle = document.getElementById('legend-toggle');
 const legendTray = document.getElementById('legend-tray');
+const exportButton = document.getElementById('export-button');
+const toolbar = document.getElementById('toolbar');
 let data = null;
 let packedData = null;
+let currentColorMap = null;
+let currentLeafColumn = null;
+let currentColorColumn = null;
 
 renderButton.addEventListener('click', renderChart);
+exportButton.addEventListener('click', exportSVG);
 
 // Legend tray toggle
 legendToggle.addEventListener('click', () => {
@@ -85,11 +91,11 @@ function addOptionsToSelector(select, options) {
 }
 
 function renderChart() {
-  const leafColumn = document.getElementById('label-column').value;
-  const colorColumn = document.getElementById('color-column').value;
+  currentLeafColumn = document.getElementById('label-column').value;
+  currentColorColumn = document.getElementById('color-column').value;
 
   // Validate required fields
-  if (!leafColumn || !colorColumn) {
+  if (!currentLeafColumn || !currentColorColumn) {
     alert('Please select both a Label column and a Color column.');
     return;
   }
@@ -99,14 +105,14 @@ function renderChart() {
   ['first-level', 'second-level', 'third-level'].forEach(menu => {
     const columnName = document.getElementById(menu).value;
     groupingFunctions.push(d => d[columnName]);
-  }) 
+  })
 
   packedData = {name: 'pack', children: []};
   const distinctColorEntries = [];
 
   for (const row of data) {
     packData(packedData, groupingFunctions, row);
-    distinctColorEntries[row[colorColumn]] = null;
+    distinctColorEntries[row[currentColorColumn]] = null;
   }
 
   const distinctCount = Object.keys(distinctColorEntries).length;
@@ -114,6 +120,8 @@ function renderChart() {
   for (const entry in distinctColorEntries) {
     distinctColorEntries[entry] = d3.interpolateRainbow(distinctIndex++ / distinctCount);
   }
+
+  currentColorMap = distinctColorEntries;
 
   convertChildrenToArrays(packedData);
 
@@ -125,9 +133,9 @@ function renderChart() {
 
   let circleChart = Pack(packedData, {
     value: d => 1000, // size of each node (file); null for internal nodes (folders)
-    label: (d, n) => d.children ? d.name : d[leafColumn],
-    title: (d, n) => d.children ? d.name : d[leafColumn] +  " - " + d[colorColumn],
-    fillFunc: (d) => distinctColorEntries[d[colorColumn]],
+    label: (d, n) => d.children ? d.name : d[currentLeafColumn],
+    title: (d, n) => d.children ? d.name : d[currentLeafColumn] +  " - " + d[currentColorColumn],
+    fillFunc: (d) => currentColorMap[d[currentColorColumn]],
     width: size,
     height: size
   });
@@ -137,7 +145,7 @@ function renderChart() {
   // Populate legend tray
   const legendItems = document.getElementById('legend-items');
   legendItems.innerHTML = '';
-  for (const [label, color] of Object.entries(distinctColorEntries)) {
+  for (const [label, color] of Object.entries(currentColorMap)) {
     const item = document.createElement('div');
     item.className = 'legend-item';
     item.innerHTML = `
@@ -147,7 +155,8 @@ function renderChart() {
     legendItems.appendChild(item);
   }
 
-  // Show and expand legend tray when chart is rendered
+  // Show toolbar and legend tray when chart is rendered
+  toolbar.classList.remove('hidden');
   legendTray.classList.remove('hidden');
   legendTray.classList.remove('collapsed');
 }
@@ -162,6 +171,220 @@ window.addEventListener('resize', () => {
     }
   }, 250);
 });
+
+function exportSVG() {
+  if (!packedData || !packedData.children || packedData.children.length === 0) {
+    alert('Please render a chart first.');
+    return;
+  }
+
+  // Build the hierarchy first to calculate sizes
+  const root = d3.hierarchy(packedData);
+  root.sum(d => d.children ? 0 : 1000);
+  root.sort((a, b) => d3.descending(a.value, b.value));
+
+  // Initial pack to get relative sizes
+  d3.pack()
+    .size([1000, 1000])
+    .padding(3)
+    (root);
+
+  const descendants = root.descendants();
+  const leaves = descendants.filter(d => !d.children);
+  leaves.forEach((d, i) => d.index = i);
+
+  // Find the longest label to determine minimum circle size
+  let maxLabelLength = 0;
+  leaves.forEach(d => {
+    const label = d.data[currentLeafColumn] || '';
+    maxLabelLength = Math.max(maxLabelLength, label.length);
+  });
+
+  // Calculate scale factor: leaf circles need to be large enough for 11px text
+  // Approximate: each character ~6px wide at 11px font, plus padding
+  const minLeafRadius = Math.max(30, (maxLabelLength * 6) / 2 + 10);
+
+  // Find the smallest leaf circle radius in the initial layout
+  const smallestLeafRadius = Math.min(...leaves.map(d => d.r));
+
+  // Scale factor to make smallest leaf circle = minLeafRadius
+  const scaleFactor = minLeafRadius / smallestLeafRadius;
+
+  // Apply scale to get final diagram size
+  const diagramSize = Math.ceil(1000 * scaleFactor);
+
+  // Re-pack at the correct size
+  d3.pack()
+    .size([diagramSize - 2, diagramSize - 2])
+    .padding(3 * scaleFactor)
+    (root);
+
+  // Recalculate descendants after re-packing
+  const finalDescendants = root.descendants();
+  const finalLeaves = finalDescendants.filter(d => !d.children);
+  finalLeaves.forEach((d, i) => d.index = i);
+
+  const legendWidth = 200;
+  const legendGap = 100;
+  const totalWidth = diagramSize + legendGap + legendWidth;
+  const totalHeight = diagramSize;
+
+  // Create SVG
+  const svg = d3.create("svg")
+    .attr("xmlns", "http://www.w3.org/2000/svg")
+    .attr("width", totalWidth)
+    .attr("height", totalHeight)
+    .attr("viewBox", `0 0 ${totalWidth} ${totalHeight}`)
+    .attr("font-family", "Helvetica, Arial, sans-serif");
+
+  // White background
+  svg.append("rect")
+    .attr("width", totalWidth)
+    .attr("height", totalHeight)
+    .attr("fill", "white");
+
+  // Diagram group
+  const diagramGroup = svg.append("g")
+    .attr("transform", `translate(1, 1)`);
+
+  // Draw circles
+  diagramGroup.selectAll("circle")
+    .data(finalDescendants)
+    .join("circle")
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", d => d.r)
+      .attr("fill", d => d.children ? "#fff" : currentColorMap[d.data[currentColorColumn]])
+      .attr("stroke", d => d.children ? "#bbb" : null)
+      .attr("stroke-width", d => d.children ? 1 : null);
+
+  // Create arc paths for parent labels
+  const uid = `export-${Math.random().toString(16).slice(2)}`;
+
+  const parentNodes = finalDescendants.filter(d => d.children && d.depth > 0);
+
+  // Add defs for arc paths
+  const defs = svg.append("defs");
+  parentNodes.forEach(d => {
+    const r = d.r;
+    const startAngle = Math.PI;
+    const endAngle = 0;
+    const x1 = d.x + r * Math.cos(startAngle);
+    const y1 = d.y + r * Math.sin(startAngle);
+    const x2 = d.x + r * Math.cos(endAngle);
+    const y2 = d.y + r * Math.sin(endAngle);
+
+    defs.append("path")
+      .attr("id", `${uid}-path-${d.data.name}-${d.depth}`)
+      .attr("d", `M ${x1},${y1} A ${r},${r} 0 0,0 ${x2},${y2}`);
+  });
+
+  // Calculate max depth for font scaling
+  const maxDepth = Math.max(...parentNodes.map(d => d.depth));
+
+  // Font size multipliers: depth 1 = 200%, depth 2 = 175%, etc. down to 125%
+  const getFontMultiplier = (depth) => {
+    if (maxDepth === 1) return 2.0;
+    const step = 0.75 / (maxDepth - 1); // Spread from 2.0 to 1.25
+    return 2.0 - (depth - 1) * step;
+  };
+
+  // Parent labels with white background
+  parentNodes.forEach(d => {
+    const fontSize = 11 * getFontMultiplier(d.depth);
+
+    // White stroke background
+    diagramGroup.append("text")
+      .style("font-size", fontSize + "px")
+      .style("letter-spacing", "-0.5px")
+      .attr("fill", "none")
+      .attr("stroke", "white")
+      .attr("stroke-width", 3)
+      .attr("stroke-linejoin", "round")
+      .append("textPath")
+        .attr("href", `#${uid}-path-${d.data.name}-${d.depth}`)
+        .attr("startOffset", "50%")
+        .attr("text-anchor", "middle")
+        .text(d.data.name);
+
+    // Actual text
+    diagramGroup.append("text")
+      .style("font-size", fontSize + "px")
+      .style("letter-spacing", "-0.5px")
+      .attr("fill", "#333")
+      .append("textPath")
+        .attr("href", `#${uid}-path-${d.data.name}-${d.depth}`)
+        .attr("startOffset", "50%")
+        .attr("text-anchor", "middle")
+        .text(d.data.name);
+  });
+
+  // Leaf labels at 11pt
+  finalLeaves.forEach(d => {
+    diagramGroup.append("text")
+      .attr("x", d.x)
+      .attr("y", d.y)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .style("font-size", "11px")
+      .attr("fill", "#333")
+      .text(d.data[currentLeafColumn]);
+  });
+
+  // Legend group
+  const legendX = diagramSize + legendGap;
+  const legendY = 20;
+  const entries = Object.entries(currentColorMap);
+
+  const legendGroup = svg.append("g")
+    .attr("transform", `translate(${legendX}, ${legendY})`);
+
+  // Legend font size
+  const legendFontSize = 22;
+  const legendCircleRadius = 8;
+  const legendItemHeightActual = legendFontSize * 1.4;
+
+  // Legend title
+  legendGroup.append("text")
+    .attr("x", 0)
+    .attr("y", 0)
+    .style("font-size", (legendFontSize * 1.2) + "px")
+    .style("font-weight", "600")
+    .attr("fill", "#333")
+    .text("Legend");
+
+  // Legend items
+  entries.forEach(([label, color], i) => {
+    const itemY = legendFontSize * 1.5 + i * legendItemHeightActual;
+
+    legendGroup.append("circle")
+      .attr("cx", legendCircleRadius)
+      .attr("cy", itemY)
+      .attr("r", legendCircleRadius)
+      .attr("fill", color);
+
+    legendGroup.append("text")
+      .attr("x", legendCircleRadius * 2 + 8)
+      .attr("y", itemY + legendFontSize * 0.35)
+      .style("font-size", legendFontSize + "px")
+      .attr("fill", "#333")
+      .text(label);
+  });
+
+  // Serialize and download
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(svg.node());
+  const blob = new Blob([svgString], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "circle-pack-diagram.svg";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 function packData(node, groupingFunctions, row) {
   if (groupingFunctions.length > 0 && groupingFunctions[0]) {

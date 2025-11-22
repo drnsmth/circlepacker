@@ -618,13 +618,13 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
         .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
         .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
 
-    // Transition parent labels
+    // Transition parent labels - show both the focused circle's label and its children's labels
     parentNodes.selectAll("text")
-      .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
+      .filter(function(d) { return d.parent === focus || d === focus || this.style.display === "inline"; })
       .transition(transition)
-        .style("fill-opacity", d => d.parent === focus ? 1 : 0)
-        .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
-        .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+        .style("fill-opacity", d => (d.parent === focus || d === focus) ? 1 : 0)
+        .on("start", function(d) { if (d.parent === focus || d === focus) this.style.display = "inline"; })
+        .on("end", function(d) { if (d.parent !== focus && d !== focus) this.style.display = "none"; });
   }
 
   return svg.node();

@@ -1,10 +1,17 @@
 
 const uploadArea = document.getElementById('upload-area');
 const renderButton = document.getElementById('render-button');
+const legendToggle = document.getElementById('legend-toggle');
+const legendTray = document.getElementById('legend-tray');
 let data = null;
 let packedData = null;
 
 renderButton.addEventListener('click', renderChart);
+
+// Legend tray toggle
+legendToggle.addEventListener('click', () => {
+  legendTray.classList.toggle('collapsed');
+});
 
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
   uploadArea.addEventListener(eventName, preventDefaults, false)
@@ -126,6 +133,23 @@ function renderChart() {
   });
 
   chartArea.replaceChildren(circleChart);
+
+  // Populate legend tray
+  const legendItems = document.getElementById('legend-items');
+  legendItems.innerHTML = '';
+  for (const [label, color] of Object.entries(distinctColorEntries)) {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `
+      <span class="legend-color" style="background-color: ${color}"></span>
+      <span class="legend-label" title="${label}">${label}</span>
+    `;
+    legendItems.appendChild(item);
+  }
+
+  // Show and expand legend tray when chart is rendered
+  legendTray.classList.remove('hidden');
+  legendTray.classList.remove('collapsed');
 }
 
 // Re-render on window resize (debounced)

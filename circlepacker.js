@@ -78,20 +78,26 @@ function addOptionsToSelector(select, options) {
 }
 
 function renderChart() {
+  const leafColumn = document.getElementById('label-column').value;
+  const colorColumn = document.getElementById('color-column').value;
+
+  // Validate required fields
+  if (!leafColumn || !colorColumn) {
+    alert('Please select both a Label column and a Color column.');
+    return;
+  }
+
   const groupingFunctions = [];
 
   ['first-level', 'second-level', 'third-level'].forEach(menu => {
-    const columnName = document.getElementById(menu).value; 
+    const columnName = document.getElementById(menu).value;
     groupingFunctions.push(d => d[columnName]);
-  })
-
-  const leafColumn = document.getElementById('label-column').value; 
-  const colorColumn = document.getElementById('color-column').value; 
+  }) 
 
   packedData = {name: 'pack', children: []};
   const distinctColorEntries = [];
 
-  for (row of data) {
+  for (const row of data) {
     packData(packedData, groupingFunctions, row);
     distinctColorEntries[row[colorColumn]] = null;
   }
@@ -158,8 +164,6 @@ function Pack(data, { // data is either tabular (array of objects) or hierarchy 
   sort = (a, b) => d3.descending(a.value, b.value), // how to sort nodes prior to layout
   label, // given a leaf node d, returns the display name
   title, // given a node d, returns its hover text
-  link, // given a node d, its link (if any)
-  linkTarget = "_blank", // the target attribute for links, if any
   width = 640, // outer width, in pixels
   height = 400, // outer height, in pixels
   margin = 1, // shorthand for margins
